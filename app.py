@@ -1,5 +1,3 @@
-# 📄 News Summarizer + Q&A using Groq API
-
 import os
 import streamlit as st
 from dotenv import load_dotenv
@@ -11,15 +9,15 @@ from langchain.vectorstores import FAISS
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
-from langchain.chains.combine_documents.stuff import StuffDocumentsChain
 from langchain.chains import RetrievalQA
+from langchain.chains.combine_documents.stuff import StuffDocumentsChain
 
 # --- Step 0: Load environment variables ---
 load_dotenv()
 
-# --- Step 1: Initialize LLM using Groq API ---
+# --- Step 1: Initialize LLM ---
 llm = ChatOpenAI(
-    model="llama3-8b-8192",  # or "gemma-7b-it"
+    model="llama3-8b-8192",
     openai_api_key=os.getenv("OPENAI_API_KEY"),
     openai_api_base=os.getenv("OPENAI_API_BASE"),
     temperature=0.5,
@@ -36,7 +34,7 @@ def scrape_article(url):
     except Exception as e:
         return None, f"Error: {str(e)}"
 
-# --- Step 3: Summarize full article text ---
+# --- Step 3: Summarize article ---
 def summarize_article(text, language="English"):
     prompt_template = """
 You are a skilled multilingual news analyst. Summarize the following news article clearly and concisely in {language}.
@@ -52,14 +50,11 @@ Article:
 
 Summary (in {language}, under 200 words):
     """
-    prompt = PromptTemplate(
-        template=prompt_template,
-        input_variables=["text", "language"]
-    )
+    prompt = PromptTemplate(template=prompt_template, input_variables=["text", "language"])
     chain = LLMChain(llm=llm, prompt=prompt)
     return chain.run({"text": text.strip(), "language": language})
 
-# --- Step 4: Create Vector DB with embeddings ---
+# --- Step 4: Create Vector DB ---
 def create_vectorstore(text):
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
     chunks = splitter.split_text(text)
@@ -67,7 +62,7 @@ def create_vectorstore(text):
     db = FAISS.from_texts(chunks, embedding=embeddings)
     return db
 
-# --- Step 5: Create Custom Retrieval Q&A Chain ---
+# --- Step 5: QA Chain with Context & Language ---
 def get_qa_chain(db, language):
     qa_prompt = PromptTemplate(
         input_variables=["context", "question", "language"],
@@ -83,33 +78,28 @@ Answer (in {language}):
 """
     )
     qa_chain = LLMChain(llm=llm, prompt=qa_prompt)
-    combine_chain = StuffDocumentsChain(
-        llm_chain=qa_chain,
-        document_variable_name="context"
-    )
-    return RetrievalQA(
-        retriever=db.as_retriever(),
-        combine_documents_chain=combine_chain
-    )
+    combine_chain = StuffDocumentsChain(llm_chain=qa_chain, document_variable_name="context")
+
+    return RetrievalQA(retriever=db.as_retriever(), combine_documents_chain=combine_chain)
 
 # --- Step 6: Streamlit UI ---
 st.set_page_config(page_title="News Summarizer & Q&A with Groq")
 st.title("📰 News Summarizer + Q&A (Powered by Groq)")
 
-# --- Language selection ---
+# Language selector
 language_options = ["English", "Hindi", "Telugu", "Spanish", "French", "German"]
 selected_language = st.selectbox("Choose summary language:", language_options, index=0)
 
-# --- Initialize session states ---
+# Session state init
 if "url_input" not in st.session_state:
     st.session_state.url_input = ""
 if "last_url" not in st.session_state:
     st.session_state.last_url = ""
 
-# --- URL Input ---
+# URL input
 url_input = st.text_input("Enter a news article URL:", value=st.session_state.url_input)
 
-# --- If new URL is entered ---
+# If new URL entered
 if url_input and (url_input != st.session_state.last_url):
     with st.spinner("🔍 Scraping article..."):
         title, content = scrape_article(url_input)
@@ -128,32 +118,32 @@ if url_input and (url_input != st.session_state.last_url):
             st.session_state.db = create_vectorstore(content)
             st.session_state.qa_chain = get_qa_chain(st.session_state.db, selected_language)
 
-        st.session_state.url_input = ""  # ✅ Clear input after processing
+        st.session_state.url_input = ""  # clear input
 
-# --- Display Summary ---
+# Show summary
 if "summary" in st.session_state:
     st.subheader(f"📰 {st.session_state.title}")
     st.success("Summary ready!")
     st.markdown("### ✨ Summary")
     st.write(st.session_state.summary)
 
-    # --- Q&A Section ---
     st.markdown("### ❓ Ask questions about the article")
-    user_question = st.text_input("Your question:")
 
-    if user_question:
-        with st.spinner("💡 Generating answer..."):
-            docs = st.session_state.qa_chain.retriever.get_relevant_documents(user_question)
+    # Q&A Logic: Only show if QA chain is ready
+    if "qa_chain" in st.session_state:
+        user_question = st.text_input("Your question:")
 
-        inputs = {
-            "input_documents": docs,
-            "question": user_question,
-            "language": selected_language
-        }
+        if user_question:
+            with st.spinner("💡 Generating answer..."):
+                docs = st.session_state.qa_chain.retriever.get_relevant_documents(user_question)
+                inputs = {
+                    "input_documents": docs,
+                    "question": user_question,
+                    "language": selected_language
+                }
+                answer = st.session_state.qa_chain.combine_documents_chain.run(inputs)
 
-        response = st.session_state.qa_chain.combine_documents_chain.invoke(inputs)
-        st.markdown("**Answer:**")
-        if isinstance(response, dict) and "output_text" in response:
-            st.success(response["output_text"])
-        else:
-            st.error("❌ Unable to extract answer.")
+            st.markdown("**Answer:**")
+            st.write(answer)
+    else:
+        st.warning("Please enter a news article URL first to enable Q&A.")
