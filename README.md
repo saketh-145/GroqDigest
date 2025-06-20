@@ -79,7 +79,7 @@ streamlit run app.py
 
 | Summarization                     | Q\&A Interface          |
 | --------------------------------- | ----------------------- |
-| ![Summary](C:\Projects\GroqDigest\photos\summary.png) | ![QA](C:\Projects\GroqDigest\photos\qa.png) |
+| ![Summary](photos/summary.png) | ![QA](photos/qa.png) |
 
 ---
 
