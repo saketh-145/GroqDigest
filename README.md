@@ -7,8 +7,6 @@
 
 An AI-powered app that summarizes news articles and answers user questions in multiple languages using the Groq API and Llama 3.
 
-![Screenshot](./screenshot.png) <!-- Add your screenshot image path -->
-
 ---
 
 ## 🚀 Features
@@ -81,7 +79,7 @@ streamlit run app.py
 
 | Summarization                     | Q\&A Interface          |
 | --------------------------------- | ----------------------- |
-| ![Summary](./preview-summary.png) | ![QA](./preview-qa.png) |
+| ![Summary](C:\Projects\GroqDigest\photos\summary.png) | ![QA](C:\Projects\GroqDigest\photos\q&a.png) |
 
 ---
 
